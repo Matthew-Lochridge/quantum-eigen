@@ -1,6 +1,5 @@
 #!/bin/bash
 #SBATCH--job-name=eigen-sweep
-#SBATCH--output=eigen-%a_%A.out
 #SBATCH--time=0:15:00
 #SBATCH--ntasks=1
 #SBATCH--cpus-per-task=1
