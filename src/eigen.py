@@ -34,6 +34,11 @@ def build_2d_hamiltonian(N=20, potential='well'):
             y = (j- N/2) * dx
             # Quadratic potential V = k * (x^2 + y^2)
             return 4. * (x**2 + y**2)
+        elif potential == 'sinusoidal':
+            x = (i- N/2) * dx
+            y = (j- N/2) * dx
+            # Sinusoidal potential V = k * sin(pi*x) * sin(pi*y)
+            return 10. * np.sin(np.pi * x) * np.sin(np.pi * y)
         else:
             return 0.
 
@@ -87,6 +92,7 @@ if __name__ == '__main__':
     parser.add_argument('--N', type=int, default=20, help='Grid size (N x N)')
     parser.add_argument('--potential', type=str, choices=['well', 'harmonic', 'sinusoidal'], default='well', help='Potential type: well or harmonic')
     parser.add_argument('--n_eigs', type=int, default=6, help='Number of eigenvalues to compute')
+    parser.add_argument('--save_gs', type=bool, default=False, help='Flag to save ground state probability density')
     args = parser.parse_args()
     if args.N <= 0:
         parser.error(f"N must be positive, got N={args.N}")
@@ -98,5 +104,9 @@ if __name__ == '__main__':
     vals, vecs = solve_eigen(N=args.N, potential=args.potential, n_eigs=args.n_eigs)
     print(f'Lowest {args.n_eigs} eigenvalues: {vals}')
     np.savetxt(f'results/eigs_N{args.N}_V{args.potential}.txt', vals)
-
+    if args.save_gs:
+        # Save ground state (first eigenvector) probability density
+        gs = vecs[:, 0]
+        gs_prob = np.abs(gs)**2
+        np.savetxt(f'results/gsProb_N{args.N}_V{args.potential}.txt', gs_prob.reshape(args.N, args.N))
 
