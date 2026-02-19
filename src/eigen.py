@@ -102,6 +102,7 @@ if __name__ == '__main__':
         parser.error(f"n_eigs must be <= N^2, got n_eigs={args.n_eigs} with N={args.N}")
     # Example local test
     vals, vecs = solve_eigen(N=args.N, potential=args.potential, n_eigs=args.n_eigs)
+    print(f'Lowest {args.n_eigs} eigenvalues: {vals}')
     np.savetxt(f'results/eigs_N{args.N}_V{args.potential}.txt', vals)
     if args.save_gs:
         # Save ground state (first eigenvector) probability density
