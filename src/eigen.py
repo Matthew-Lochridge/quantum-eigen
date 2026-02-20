@@ -38,7 +38,7 @@ def build_2d_hamiltonian(N=20, potential='well'):
             x = (i- N/2) * dx
             y = (j- N/2) * dx
             # Sinusoidal potential V = k * sin(pi*x) * sin(pi*y)
-            return 10. * np.sin(np.pi * x) * np.sin(np.pi * y)
+            return 100. * np.sin(np.pi * x) * np.sin(np.pi * y)
         else:
             return 0.
 
