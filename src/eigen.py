@@ -66,8 +66,8 @@ def build_2d_hamiltonian(N=20, potential='well', bc=None):
         boundary = np.zeros((N, N), dtype=np.float64)
         def boundary_value(x, y):
             # example function; can be modified as needed
-            a = 0.
-            b = 0.
+            a = 0.003
+            b = 0.003
             return a*x + b*y
         for i in range(N):
             for j in range(N):
@@ -112,6 +112,81 @@ def build_2d_hamiltonian(N=20, potential='well', bc=None):
                 H[row, idx(i, j + 1)] = -inv_dx2
     return H
 
+def pad_and_smooth_probability(gs_prob, N, boundary=None, tol=1e-15, max_iter=1000):
+    """Pad an interior probability array with boundary data and smooth edges.
+
+    When Dirichlet boundary conditions are present the routine begins with a
+    *guess* for the interior values equal to the average of the prescribed
+    boundary entries.  An iterative relaxation is then performed in which the
+    interior is repeatedly replaced by the average of its four nearest
+    neighbours, followed by a mild blending with the original ``gs_prob`` data.
+    The process terminates when the change between iterations falls below
+    ``tol`` or ``max_iter`` is reached.  The final array is clipped to be
+    non-negative so that it may be interpreted as a probability density.
+
+    This strategy produces a solution that is smooth across the interface
+    between interior and boundary regions, and the iterative averaging
+    guarantees convergence rather than a single tack-on correction.
+
+    Parameters
+    ----------
+    gs_prob : ndarray
+        Interior probability values (typically ``abs(eigvec)**2`` reshaped).
+    N : int
+        Total number of grid points in each dimension.
+    boundary : ndarray or None
+        N-by-N array of prescribed boundary values; interior entries may be
+        ignored.  If ``None`` the padding step simply inserts zeros.
+    tol : float
+        Convergence tolerance for the iterative smoothing loop.
+    max_iter : int
+        Maximum number of smoothing iterations to perform.
+
+    Returns
+    -------
+    padded : ndarray
+        ``N x N`` array containing the padded and smoothed probability density.
+    """
+    padded = np.zeros((N, N), dtype=gs_prob.dtype)
+    # if there's a boundary, fill it first and compute an average value
+    if boundary is not None:
+        padded[0, :] = boundary[0, :]
+        padded[-1, :] = boundary[-1, :]
+        padded[:, 0] = boundary[:, 0]
+        padded[:, -1] = boundary[:, -1]
+        # compute average over the explicit boundary points
+        mask = np.zeros((N, N), dtype=bool)
+        mask[0, :] = mask[-1, :] = mask[:, 0] = mask[:, -1] = True
+        bvals = padded[mask]
+        avg = np.mean(bvals) if bvals.size > 0 else 0.0
+        # initialize interior guess with boundary average
+        padded[1:-1, 1:-1] = avg
+        # perform iterative relaxation, blending towards the original data
+        converged = False
+        for k in range(1, max_iter + 1):
+            old = padded.copy()
+            # neighbour average for interior
+            neigh = 0.25 * (
+                old[:-2, 1:-1] + old[2:, 1:-1] + old[1:-1, :-2] + old[1:-1, 2:]
+            )
+            padded[1:-1, 1:-1] = 0.5 * (neigh + gs_prob)
+            padded = np.maximum(padded, 0.)
+            if np.linalg.norm(padded - old) < tol:
+                converged = True
+                break
+        if not converged:
+            import warnings
+            warnings.warn(
+                f"pad_and_smooth_probability did not converge in {max_iter} "
+                "iterations (tol={tol}). Results may be unsmoothed.",
+                RuntimeWarning,
+            )
+    else:
+        # no boundary: just insert the interior values directly
+        padded[1:-1, 1:-1] = gs_prob
+    return padded
+
+
 def solve_eigen(N=20, potential='well', n_eigs=None, bc=None):
     """
     Build a 2D Hamiltonian (possibly with boundary conditions) and solve for
@@ -136,7 +211,12 @@ def solve_eigen(N=20, potential='well', n_eigs=None, bc=None):
         The corresponding eigenvectors.
     boundary : ndarray or None
         If ``bc=='dirichlet'`` the N-by-N array of boundary values computed by
-        ``build_2d_hamiltonian``; otherwise ``None``.
+        ``build_2d_hamiltonian``; otherwise ``None``.  When the boundary array
+        is not None the caller may pad interior solutions with the prescribed
+        edge data.  The convenience code in ``__main__`` additionally performs
+        a simple averaging step on the interior-adjacent grid points so that
+        the probability density connects smoothly to the boundaries while
+        remaining non-negative.
     """
     result = build_2d_hamiltonian(N, potential, bc=bc)
     if isinstance(result, tuple):
@@ -179,20 +259,10 @@ if __name__ == '__main__':
         # Save ground state (first eigenvector) probability density
         gs_prob = np.abs(vecs[:, 0])**2
         if args.bc == 'dirichlet':
-            # reshape to (N-2, N-2) for interior points only
+            # reshape to interior grid and pad/smooth using helper function
             gs_prob = gs_prob.reshape(args.N - 2, args.N - 2)
-            # pad with zeros to restore full N x N grid including boundaries
-            padded = np.zeros((args.N, args.N), dtype=gs_prob.dtype)
-            # interior points correspond to indices 1..N-2 in each dimension
-            padded[1:-1, 1:-1] = gs_prob
-            # incorporate boundary array if available
-            if boundary is not None:
-                padded[0, :] = boundary[0, :]
-                padded[-1, :] = boundary[-1, :]
-                padded[:, 0] = boundary[:, 0]
-                padded[:, -1] = boundary[:, -1]
-            gs_prob = padded
-        elif args.bc is None:
+            gs_prob = pad_and_smooth_probability(gs_prob, args.N, boundary)
+        else:
             gs_prob = gs_prob.reshape(args.N, args.N)
         np.savetxt(f'results/gsProb_N{args.N}_V{args.potential}.txt', gs_prob)
 
