@@ -15,7 +15,7 @@ def build_2d_hamiltonian(N=20, potential='well'):
     The Hamiltonian matrix approximating-d^2/dx^2- d^2/dy^2 + V(x,y).
     """
     dx = 1. / float(N) # grid spacing, can be arbitrary
-    inv_dx2 = float(N * N) # 1/dx^2
+    inv_dx2 = float(N * N) # 1/dx^2 (hbar^2/2m = 1 for simplicity)
     H = np.zeros((N*N, N*N), dtype=np.float64)
 
     # Helper function to map (i,j)-> linear index
@@ -30,13 +30,13 @@ def build_2d_hamiltonian(N=20, potential='well'):
             return 0.
         # Example 2: 2D harmonic oscillator around center
         elif potential == 'harmonic':
-            x = (i- N/2) * dx
-            y = (j- N/2) * dx
-            # Quadratic potential V = k * (x^2 + y^2)
+            x = (i - N/2) * dx
+            y = (j - N/2) * dx
+            # Quadratic potential V = k/2 * (x^2 + y^2)
             return 4. * (x**2 + y**2)
         elif potential == 'sinusoidal':
-            x = (i- N/2) * dx
-            y = (j- N/2) * dx
+            x = (i - N/2) * dx
+            y = (j - N/2) * dx
             # Sinusoidal potential V = k * sin(pi*x) * sin(pi*y)
             return 100. * np.sin(np.pi * x) * np.sin(np.pi * y)
         else:
@@ -47,16 +47,16 @@ def build_2d_hamiltonian(N=20, potential='well'):
         for j in range(N):
             row = idx(i,j)
             # Potential
-            H[row, row] =-4. * inv_dx2 + V(i,j) # "Kinetic" ~-4/dx^2 in 2D FD
+            H[row, row] = 4. * inv_dx2 + V(i,j) # "Kinetic" ~-4/dx^2 in 2D FD
             # Neighbors (assuming no boundary conditions or Dirichlet)
             if i > 0: # up
-                H[row, idx(i-1, j)] = inv_dx2
+                H[row, idx(i-1, j)] = -inv_dx2
             if i < N-1: # down
-                H[row, idx(i+1, j)] = inv_dx2
+                H[row, idx(i+1, j)] = -inv_dx2
             if j > 0: # left
-                H[row, idx(i, j-1)] = inv_dx2
+                H[row, idx(i, j-1)] = -inv_dx2
             if j < N-1: # right
-                H[row, idx(i, j+1)] = inv_dx2
+                H[row, idx(i, j+1)] = -inv_dx2
     return H
 
 def solve_eigen(N=20, potential='well', n_eigs=None):
