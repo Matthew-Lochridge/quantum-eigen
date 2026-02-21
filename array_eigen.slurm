@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=2G
-#SBATCH --array=0-14
+#SBATCH --array=0-32
 #SBATCH --partition=cpu-preempt
 
 # Optional: Load modules
@@ -15,7 +15,7 @@
 set -euo pipefail
 
 # Sweep values
-Ns=(10 20 40 80 160)
+Ns=(10 20 40 80 160 320 640 1280 2560 5120 10240)
 potentials=(well harmonic sinusoidal)
 
 nN=${#Ns[@]}
@@ -33,4 +33,4 @@ ip=$(( SLURM_ARRAY_TASK_ID % np ))
 N=${Ns[$iN]}
 pot=${potentials[$ip]}
 
-python3 src/eigen.py --N "$N" --potential "$pot" --n_eigs 6 --save_gs "True"
+python3 src/eigen.py --N "$N" --potential "$pot" --n_eigs 6 --bc 'dirichlet' --save_gs "True"
